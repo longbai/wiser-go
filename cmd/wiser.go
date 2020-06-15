@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/longbai/wiser-go/db"
-	"github.com/longbai/wiser-go/search"
+	"github.com/longbai/wiser-go/engine"
 	"github.com/longbai/wiser-go/source"
 	"github.com/longbai/wiser-go/util"
 	"os"
@@ -37,7 +37,7 @@ func main() {
 	}
 	dbPath := args[len(args)-1]
 	if *wikipediaDump != "" {
-		_, e :=os.Stat(dbPath)
+		_, e := os.Stat(dbPath)
 		if e == nil {
 			fmt.Println(dbPath, "is already exists!")
 			return
@@ -68,21 +68,45 @@ func main() {
 
 func query(database *db.Db, query *string, enablePhraseSearch *bool) {
 	cm, _ := database.GetSettings("compress_method")
-	indexCount := database.GetDocumentCount()
-	search.Search(*query, cm, indexCount, database, *enablePhraseSearch)
+	indexCount, _ := database.GetDocumentCount()
+	engine.Search(*query, cm, indexCount, database, *enablePhraseSearch)
 }
 
-func buildIndex(database *db.Db, compressMethod *string, wikipediaDump *string, maxIndexCount, iibuThreshold *int) (err error){
+func buildPostings(title, body string, db *db.Db, iiBufferCount *int)(err error) {
+	if title == "" || body == "" {
+		return
+	}
+	err = db.AddDocument(title, body)
+	if err != nil {
+		return
+	}
+	var did int
+	did, err = db.GetDocumentId(title)
+	if err != nil {
+		return
+	}
+	fmt.Println(did)
+	//engine.TokenToPostingsList(did, body, engine.NGram)
+	//*iiBufferCount++
+	return nil
+}
+
+func mergePostings() {
+
+}
+
+func buildIndex(database *db.Db, compressMethod *string, wikipediaDump *string, maxIndexCount, iibuThreshold *int) (err error) {
 	err = database.SetSettings("compress_method", *compressMethod)
 	if err != nil {
 		return err
 	}
 	database.Begin()
-	if err = source.LoadWiki(*wikipediaDump, *maxIndexCount, func(title, body string) error {
-		fmt.Println(title, body)
-		return database.AddDocument(title, body)
-	});err != nil {
-		//add doc finish
+	if err = source.LoadWiki(*wikipediaDump, *maxIndexCount, func(title, body string) (err error) {
+		err = buildPostings(title, body, database, nil)
+		mergePostings()
+		return
+	}); err != nil {
+		mergePostings()
 		database.Commit()
 	} else {
 		database.Rollback()

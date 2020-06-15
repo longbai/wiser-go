@@ -46,15 +46,18 @@ func Open(path string) (*Db, error) {
 	ret.get_document_title_st, _ = d.Prepare("SELECT title FROM documents WHERE id = ?;")
 	ret.insert_document_st, _ = d.Prepare("INSERT INTO documents (title, body) VALUES (?, ?);")
 	ret.update_document_st, _ = d.Prepare("UPDATE documents set body = ? WHERE id = ?;")
+	ret.get_document_count_st, _ = d.Prepare("SELECT COUNT(*) FROM documents;")
 
 	ret.get_token_id_st, _ = d.Prepare("SELECT id, docs_count FROM tokens WHERE token = ?;")
 	ret.get_token_st, _ = d.Prepare("SELECT token FROM tokens WHERE id = ?;")
 	ret.store_token_st, _ = d.Prepare("INSERT OR IGNORE INTO tokens (token, docs_count, postings) VALUES (?, 0, ?);")
+
 	ret.get_postings_st, _ = d.Prepare("SELECT docs_count, postings FROM tokens WHERE id = ?;")
 	ret.update_postings_st, _ = d.Prepare("UPDATE tokens SET docs_count = ?, postings = ? WHERE id = ?;")
+
 	ret.get_settings_st, _ = d.Prepare("SELECT value FROM settings WHERE key = ?;")
 	ret.set_settings_st, _ = d.Prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?);")
-	ret.get_document_count_st, _ = d.Prepare("SELECT COUNT(*) FROM documents;")
+
 
 	ret.begin_st, _ = d.Prepare("BEGIN;")
 	ret.commit_st, _ = d.Prepare("COMMIT;")
@@ -67,32 +70,55 @@ func (db *Db) Close() {
 	db.db.Close()
 }
 
-func (db *Db) GetDocumentId(title string) (int32, error) {
-	return 0, nil
+func (db *Db) GetDocumentId(title string) (int, error) {
+	var value int
+	err := db.get_document_id_st.QueryRow(title).Scan(&value)
+	return value, err
 }
 
-func (db *Db) GetDocumentTitle(id int32) (string, error) {
-	return "", nil
+func (db *Db) GetDocumentTitle(id int) (string, error) {
+	var value string
+	err := db.get_document_title_st.QueryRow(id).Scan(&value)
+	return value, err
 }
 
 func (db *Db) AddDocument(title, body string) error {
-	return nil
+	did, err := db.GetDocumentId(title)
+	if err != nil {
+		return err
+	}
+	if did != 0 {
+		_, err = db.update_document_st.Exec(body, did)
+	} else {
+		_, err = db.insert_document_st.Exec(title, body)
+	}
+	return err
 }
 
-func (db *Db) GetTokenId() {
-
+func (db *Db) GetTokenId(token string, insert bool)(id, count int, err error) {
+	if insert {
+		_, err = db.store_token_st.Exec(token, "")
+		if err != nil {
+			return
+		}
+	}
+	err = db.get_token_id_st.QueryRow(token).Scan(&id, &count)
+	return
 }
 
-func (db *Db) GetToken() {
-
+func (db *Db) GetToken(id int)(token string, err error) {
+	err = db.get_token_st.QueryRow(id).Scan(&token)
+	return
 }
 
-func (db *Db) GetPostings() {
-
+func (db *Db) GetPostings(id int) (count int, postings []byte, err error){
+	err = db.get_postings_st.QueryRow(id).Scan(&count, &postings)
+	return
 }
 
-func (db *Db) UpdatePostings(tokenId int32) {
-
+func (db *Db) UpdatePostings(tokenId int, docCount int, postings []byte) (err error){
+	_, err = db.update_postings_st.Exec(docCount, postings, tokenId)
+	return
 }
 
 func (db *Db) SetSettings(name, value string) error{
@@ -100,14 +126,14 @@ func (db *Db) SetSettings(name, value string) error{
 	return err
 }
 
-func (db *Db) GetSettings(name string) (string, error) {
-	var value string
-	err := db.get_settings_st.QueryRow(name).Scan(&value)
-	return value, err
+func (db *Db) GetSettings(name string) (value string, err error) {
+	err = db.get_settings_st.QueryRow(name).Scan(&value)
+	return
 }
 
-func (db *Db) GetDocumentCount() int {
-	return 0
+func (db *Db) GetDocumentCount() (count int, err error) {
+	err = db.get_document_count_st.QueryRow().Scan(&count)
+	return
 }
 
 func (db *Db) Begin() {
