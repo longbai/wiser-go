@@ -26,11 +26,15 @@ func main() {
 	compressMethod := flag.String("c", "golomb", "compress method for postings list(none   : don't compress;golomb : Golomb-Rice,default)")
 	wikipediaDump := flag.String("x", "", "wikipedia dump xml path for indexing")
 	queryStr := flag.String("q", "", "query for search")
-	maxIndexCount := flag.Int("m", 0, "max count for indexing document")
-	iibuThreshold := flag.Int("t", 0, "inverted index buffer merge threshold")
+	maxIndexCount := flag.Int("m", -1, "max count for indexing document")
+	iibuThreshold := flag.Int("t", 2048, "inverted index buffer merge threshold")
 	enablePhraseSearch := flag.Bool("s", true, "enable phrase search")
 	flag.Parse()
 	args := flag.Args()
+	if len(args) == 0 {
+		flag.PrintDefaults()
+		return
+	}
 	dbPath := args[len(args)-1]
 	if *wikipediaDump != "" {
 		_, e :=os.Stat(dbPath)
@@ -45,35 +49,43 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+	defer database.Close()
+	defer util.PrintTimeDiff()
 	util.PrintTimeDiff()
 
 	if *wikipediaDump != "" {
-		buildIndex(database, compressMethod, wikipediaDump, maxIndexCount, iibuThreshold)
+		err = buildIndex(database, compressMethod, wikipediaDump, maxIndexCount, iibuThreshold)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 
 	if *queryStr != "" {
 		query(database, queryStr, enablePhraseSearch)
 	}
-	database.Close()
-	util.PrintTimeDiff()
 }
 
 func query(database *db.Db, query *string, enablePhraseSearch *bool) {
-	cm := database.GetSettings("compress_method")
+	cm, _ := database.GetSettings("compress_method")
 	indexCount := database.GetDocumentCount()
 	search.Search(*query, cm, indexCount, database, *enablePhraseSearch)
 }
 
-func buildIndex(database *db.Db, compressMethod *string, wikipediaDump *string, maxIndexCount, ii_buffer_update_threshold *int) {
-	database.SetSettings("compress_method", *compressMethod)
+func buildIndex(database *db.Db, compressMethod *string, wikipediaDump *string, maxIndexCount, iibuThreshold *int) (err error){
+	err = database.SetSettings("compress_method", *compressMethod)
+	if err != nil {
+		return err
+	}
 	database.Begin()
-	if source.LoadWiki(*wikipediaDump, *maxIndexCount, func(title, body string) {
+	if err = source.LoadWiki(*wikipediaDump, *maxIndexCount, func(title, body string) error {
 		fmt.Println(title, body)
-		database.AddDocument(title, body)
-	}) != nil {
-		//add doc
+		return database.AddDocument(title, body)
+	});err != nil {
+		//add doc finish
 		database.Commit()
 	} else {
 		database.Rollback()
 	}
+	return
 }
