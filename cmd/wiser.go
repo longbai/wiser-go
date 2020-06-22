@@ -54,7 +54,7 @@ func main() {
 	util.PrintTimeDiff()
 
 	if *wikipediaDump != "" {
-		err = buildIndex(database, compressMethod, wikipediaDump, maxIndexCount, iibuThreshold)
+		err = buildIndex(database, *compressMethod, *wikipediaDump, *maxIndexCount, *iibuThreshold)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -72,7 +72,7 @@ func query(database *db.Db, query *string, enablePhraseSearch *bool) {
 	engine.Search(*query, cm, indexCount, database, *enablePhraseSearch)
 }
 
-func buildPostings(title, body string, db *db.Db, iiBufferCount *int)(err error) {
+func buildPostings(title, body string, db *db.Db, buffer *engine.TokenIndex)(err error) {
 	if title == "" || body == "" {
 		return
 	}
@@ -85,28 +85,23 @@ func buildPostings(title, body string, db *db.Db, iiBufferCount *int)(err error)
 	if err != nil {
 		return
 	}
-	fmt.Println(did)
-	//engine.TokenToPostingsList(did, body, engine.NGram)
-	//*iiBufferCount++
-	return nil
+	err = buffer.TextToPostingsLists(did, body)
+	return
 }
 
-func mergePostings() {
-
-}
-
-func buildIndex(database *db.Db, compressMethod *string, wikipediaDump *string, maxIndexCount, iibuThreshold *int) (err error) {
-	err = database.SetSettings("compress_method", *compressMethod)
+func buildIndex(database *db.Db, compressMethod string, wikipediaDump string, maxIndexCount, iibuThreshold int) (err error) {
+	err = database.SetSettings("compress_method", compressMethod)
 	if err != nil {
 		return err
 	}
 	database.Begin()
-	if err = source.LoadWiki(*wikipediaDump, *maxIndexCount, func(title, body string) (err error) {
-		err = buildPostings(title, body, database, nil)
-		mergePostings()
+	buffer := engine.NewTokenIndex(database, compressMethod)
+	if err = source.LoadWiki(wikipediaDump, maxIndexCount, func(title, body string) (err error) {
+		err = buildPostings(title, body, database, buffer)
+		buffer.Flush(iibuThreshold)
 		return
 	}); err != nil {
-		mergePostings()
+		buffer.Flush(0)
 		database.Commit()
 	} else {
 		database.Rollback()

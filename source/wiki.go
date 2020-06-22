@@ -31,7 +31,7 @@ func CanonicalizeTitle(title string) string {
 
 var filter, _ = regexp.Compile("^file:.*|^talk:.*|^special:.*|^wikipedia:.*|^wiktionary:.*|^user:.*|^user_talk:.*")
 
-func LoadWiki(wikipedia string, maxIndexCount int, handler DocHandler)(err error){
+func LoadWiki(wikipedia string, maxArticleCount int, handler DocHandler)(err error){
 	var f *os.File
 	f, err = os.Open(wikipedia)
 	if err != nil {
@@ -42,7 +42,7 @@ func LoadWiki(wikipedia string, maxIndexCount int, handler DocHandler)(err error
 	d := xml.NewDecoder(f)
 	count := 0
 	for {
-		if maxIndexCount != -1 && count >= maxIndexCount {
+		if maxArticleCount != -1 && count >= maxArticleCount {
 			break
 		}
 		var tok xml.Token
