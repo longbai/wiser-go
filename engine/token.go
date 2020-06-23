@@ -108,11 +108,11 @@ func ignoreChar(r rune) bool {
 }
 
 // expect ngram is 2
-func (p *TokenIndex)TextToPostingsLists(documentId int, body string)(err error){
+func (p *TokenIndex) TextToPostingsLists(documentId int, body string) (err error) {
 	var lastRune rune
 	ignoreLast := false
 	p2 := &TokenIndex{
-		index:    make(map[int]*TokenIndexItems),
+		index:    make(map[int]*tokenIndexItems),
 		database: p.database,
 	}
 	for i, r := range body {
@@ -122,7 +122,7 @@ func (p *TokenIndex)TextToPostingsLists(documentId int, body string)(err error){
 		}
 		if !ignoreLast && i != 0 {
 			s := string([]rune{lastRune, r})
-			err = p2.TokenToPostingsList(documentId, s, i-1)
+			err = p2.tokenToPostingsList(documentId, s, i-1)
 			if err != nil {
 				return
 			}
@@ -133,8 +133,8 @@ func (p *TokenIndex)TextToPostingsLists(documentId int, body string)(err error){
 	return
 }
 
-func (p *TokenIndex)TokenToPostingsList(documentId int, token string, position int) error {
-	id, count, err := p.database.GetTokenId(token, documentId>0)
+func (p *TokenIndex) tokenToPostingsList(documentId int, token string, position int) error {
+	id, count, err := p.database.GetTokenId(token, documentId > 0)
 	if err != nil {
 		return err
 	}
@@ -143,19 +143,20 @@ func (p *TokenIndex)TokenToPostingsList(documentId int, token string, position i
 	}
 	entry, ok := p.index[id]
 	if !ok {
-		entry = &TokenIndexItems{
-			DocCount:       count,
-			PositionsCount: 0,
-			Postings:       &encoding.PostingsList{
-				DocumentId:     documentId,
-				Positions:      nil,
-				Next:           nil,
+		entry = &tokenIndexItems{
+			tokenId:        id,
+			docCount:       count,
+			positionsCount: 0,
+			postings: &encoding.PostingsList{
+				DocumentId: documentId,
+				Positions:  nil,
+				Next:       nil,
 			},
 		}
 		p.index[id] = entry
 
 	}
-	entry.Postings.Positions = append(entry.Postings.Positions, position)
-	entry.PositionsCount++
+	entry.postings.Positions = append(entry.postings.Positions, position)
+	entry.positionsCount++
 	return nil
 }

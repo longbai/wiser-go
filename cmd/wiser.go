@@ -3,11 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/longbai/wiser-go/db"
 	"github.com/longbai/wiser-go/engine"
 	"github.com/longbai/wiser-go/source"
 	"github.com/longbai/wiser-go/util"
-	"os"
 )
 
 //"usage: %s [options] db_file\n"
@@ -62,14 +63,14 @@ func main() {
 	}
 
 	if *queryStr != "" {
-		query(database, queryStr, enablePhraseSearch)
+		query(database, *queryStr, *enablePhraseSearch)
 	}
 }
 
-func query(database *db.Db, query *string, enablePhraseSearch *bool) {
+func query(database *db.Db, query string, enablePhraseSearch bool) {
 	cm, _ := database.GetSettings("compress_method")
 	indexCount, _ := database.GetDocumentCount()
-	engine.Search(*query, cm, indexCount, database, *enablePhraseSearch)
+	engine.Search(query, cm, indexCount, database, enablePhraseSearch)
 }
 
 func buildPostings(title, body string, db *db.Db, buffer *engine.TokenIndex)(err error) {

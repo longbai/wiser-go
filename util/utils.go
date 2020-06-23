@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -16,4 +17,8 @@ func PrintTimeDiff() {
 		diff := t.UnixNano() - (*preTime).UnixNano()
 		fmt.Printf("[time] %s (diff %d)", t.String(), diff)
 	}
+}
+
+func Abort(){
+	log.Panicln("abort")
 }
