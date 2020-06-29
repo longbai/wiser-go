@@ -2,8 +2,6 @@ package db
 
 import (
 	"database/sql"
-	"fmt"
-
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -84,20 +82,26 @@ func (db *Db) GetDocumentTitle(id int) (string, error) {
 	return value, err
 }
 
-func (db *Db) AddDocument(title, body string) error {
-	did, err := db.GetDocumentId(title)
-	fmt.Println("did", did, err, len(body))
+func (db *Db) AddDocument(title, body string) (did int, err error) {
+	did, err = db.GetDocumentId(title)
 	if err != nil && err != sql.ErrNoRows {
-		return err
+		return
 	}
 	if did != 0 {
 		_, err = db.update_document_st.Exec(body, did)
-		fmt.Println("111", err)
 	} else {
-		_, err = db.insert_document_st.Exec(title, body)
-		fmt.Println("222", err)
+		var r sql.Result
+		r, err = db.insert_document_st.Exec(title, body)
+		var did1 int64
+		did1, err = r.LastInsertId()
+		did = int(did1)
 	}
-	return err
+	return
+}
+
+func (db *Db) GetDocumentCount() (count int, err error) {
+	err = db.get_document_count_st.QueryRow().Scan(&count)
+	return
 }
 
 func (db *Db) GetTokenId(token string, insert bool)(id, count int, err error) {
@@ -133,11 +137,6 @@ func (db *Db) SetSettings(name, value string) error{
 
 func (db *Db) GetSettings(name string) (value string, err error) {
 	err = db.get_settings_st.QueryRow(name).Scan(&value)
-	return
-}
-
-func (db *Db) GetDocumentCount() (count int, err error) {
-	err = db.get_document_count_st.QueryRow().Scan(&count)
 	return
 }
 

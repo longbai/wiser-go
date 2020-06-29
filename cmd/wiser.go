@@ -58,7 +58,7 @@ func main() {
 	util.PrintTimeDiff()
 
 	if *wikipediaDump != "" {
-		err = buildIndex(database, *compressMethod, *wikipediaDump, *maxIndexCount, *iibuThreshold)
+		err = construct(database, *compressMethod, *wikipediaDump, *maxIndexCount, *iibuThreshold)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -76,46 +76,23 @@ func query(database *db.Db, query string, enablePhraseSearch bool) {
 	engine.Search(query, cm, indexCount, database, enablePhraseSearch)
 }
 
-func buildPostings(title, body string, db *db.Db, buffer *engine.TokenIndex)(err error) {
-	if title == "" || body == "" {
-		return
-	}
-	err = db.AddDocument(title, body)
-	fmt.Println("add", err)
-	if err != nil {
-		return
-	}
-	var did int
-	did, err = db.GetDocumentId(title)
-	fmt.Println("get", err)
-	if err != nil {
-		return
-	}
-	err = buffer.TextToPostingsLists(did, body)
-	fmt.Println("text", err)
-	return
-}
-
-func buildIndex(database *db.Db, compressMethod string, wikipediaDump string, maxIndexCount, iibuThreshold int) (err error) {
+func construct(database *db.Db, compressMethod string, wikipediaDump string, maxIndexCount, iibuThreshold int) (err error) {
 	err = database.SetSettings("compress_method", compressMethod)
 	if err != nil {
 		return err
 	}
 	database.Begin()
-	i := 0
-	buffer := engine.NewTokenIndex(database, compressMethod)
+
+	engine1 := engine.NewEngine(database, compressMethod, iibuThreshold)
 	if err = source.LoadWiki(wikipediaDump, maxIndexCount, func(title, body string) (err error) {
-		fmt.Println("count", i, title)
-		i++
 		if scan {
 			return
 		}
-		err = buildPostings(title, body, database, buffer)
-		buffer.Flush(iibuThreshold)
-
+		err = engine1.BuildPostings(title, body)
+		engine1.Flush()
 		return
 	}); err != nil {
-		buffer.Flush(0)
+		engine1.Flush()
 		database.Commit()
 	} else {
 		database.Rollback()

@@ -21,6 +21,7 @@ func Merge(base, added *PostingsList) (ret *PostingsList) {
 		var e *PostingsList
 		if added == nil || (base != nil && base.DocumentId <= added.DocumentId) {
 			e = base
+			base = base.Next
 		} else if base == nil || base.DocumentId >= added.DocumentId {
 			e = added
 			added = added.Next

@@ -79,7 +79,7 @@ func (p *TokenIndex) fetchPostings(tokenId int) (pl *encoding.PostingsList, leng
 
 func (p *TokenIndex) encodePostings(postings *encoding.PostingsList, count int) []byte {
 	switch p.compress {
-	case "":
+	case "none":
 		return encoding.EncodePostingsNone(postings)
 	case "golomb":
 		c, _ := p.database.GetDocumentCount()
@@ -92,11 +92,12 @@ func (p *TokenIndex) encodePostings(postings *encoding.PostingsList, count int) 
 
 func (p *TokenIndex) decodePostings(data []byte) (list *encoding.PostingsList, count int, err error) {
 	switch p.compress {
-	case "":
+	case "none":
 		encoding.DecodePostingsNone(data)
 	case "golomb":
 		encoding.DecodePostingsGolomb(data)
 	default:
+
 		util.Abort()
 	}
 	return
