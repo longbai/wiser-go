@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -85,13 +86,16 @@ func (db *Db) GetDocumentTitle(id int) (string, error) {
 
 func (db *Db) AddDocument(title, body string) error {
 	did, err := db.GetDocumentId(title)
-	if err != nil {
+	fmt.Println("did", did, err, len(body))
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 	if did != 0 {
 		_, err = db.update_document_st.Exec(body, did)
+		fmt.Println("111", err)
 	} else {
 		_, err = db.insert_document_st.Exec(title, body)
+		fmt.Println("222", err)
 	}
 	return err
 }

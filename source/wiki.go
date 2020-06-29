@@ -66,14 +66,14 @@ func LoadWiki(wikipedia string, maxArticleCount int, handler DocHandler)(err err
 				_ = d.DecodeElement(&p, &ty)
 
 				// Do some stuff with the page.
-				p.Title = CanonicalizeTitle(p.Title)
 				m := filter.MatchString(p.Title)
 				if !m && p.Redirect.Title == "" {
 					err = handler(p.Title, p.Text)
+					count++
 					if err != nil {
+						fmt.Println(err)
 						break
 					}
-					count++
 				}
 			}
 		default:

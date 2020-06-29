@@ -23,6 +23,7 @@ import (
 //"  none   : don't compress.\n"
 //"  golomb : Golomb-Rice coding(default).\n",
 
+var scan bool
 func main() {
 	compressMethod := flag.String("c", "golomb", "compress method for postings list(none   : don't compress;golomb : Golomb-Rice,default)")
 	wikipediaDump := flag.String("x", "", "wikipedia dump xml path for indexing")
@@ -30,7 +31,9 @@ func main() {
 	maxIndexCount := flag.Int("m", -1, "max count for indexing document")
 	iibuThreshold := flag.Int("t", 2048, "inverted index buffer merge threshold")
 	enablePhraseSearch := flag.Bool("s", true, "enable phrase search")
+	trace := flag.Bool("scan", false, "trace wiki")
 	flag.Parse()
+	scan = *trace
 	args := flag.Args()
 	if len(args) == 0 {
 		flag.PrintDefaults()
@@ -78,15 +81,18 @@ func buildPostings(title, body string, db *db.Db, buffer *engine.TokenIndex)(err
 		return
 	}
 	err = db.AddDocument(title, body)
+	fmt.Println("add", err)
 	if err != nil {
 		return
 	}
 	var did int
 	did, err = db.GetDocumentId(title)
+	fmt.Println("get", err)
 	if err != nil {
 		return
 	}
 	err = buffer.TextToPostingsLists(did, body)
+	fmt.Println("text", err)
 	return
 }
 
@@ -96,10 +102,17 @@ func buildIndex(database *db.Db, compressMethod string, wikipediaDump string, ma
 		return err
 	}
 	database.Begin()
+	i := 0
 	buffer := engine.NewTokenIndex(database, compressMethod)
 	if err = source.LoadWiki(wikipediaDump, maxIndexCount, func(title, body string) (err error) {
+		fmt.Println("count", i, title)
+		i++
+		if scan {
+			return
+		}
 		err = buildPostings(title, body, database, buffer)
 		buffer.Flush(iibuThreshold)
+
 		return
 	}); err != nil {
 		buffer.Flush(0)

@@ -10,6 +10,7 @@ import (
 )
 
 type tokenIndexItems struct {
+	token		string // for debug
 	tokenId        int
 	docCount       int
 	positionsCount int
@@ -47,7 +48,7 @@ func (p *TokenIndex) Flush(threshold int) {
 	}
 
 	p.index = make(map[int]*tokenIndexItems)
-	fmt.Println("index flushed")
+	fmt.Println("index flushed", threshold)
 	util.PrintTimeDiff()
 }
 
@@ -130,7 +131,9 @@ func (p *TokenIndex) Merge(other *TokenIndex) {
 	}
 	for k, v := range other.index {
 		if v2, ok := p.index[k]; ok {
+			fmt.Println("merge list", v2.tokenId, v2.token, v2.docCount, v.tokenId, v.token, v.docCount)
 			v2.merge(v)
+			fmt.Println("merge done")
 		} else {
 			p.index[k] = v
 		}
