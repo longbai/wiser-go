@@ -190,7 +190,7 @@ func (t *TokenIndex) sortItems() ByCount {
 
 func splitQueryToTokens(query, compressMethod string, d *db.Db) (*TokenIndex, error) {
 	index := NewTokenIndex(d, compressMethod)
-	err := index.TextToPostingsLists(0, query)
+	err := index.TextToPostingsLists(QueryDocId, query)
 	if err != nil {
 		return nil, err
 	}

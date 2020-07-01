@@ -89,10 +89,10 @@ func construct(database *db.Db, compressMethod string, wikipediaDump string, max
 			return
 		}
 		err = engine1.BuildPostings(title, body)
-		engine1.Flush()
+		engine1.Flush(iibuThreshold)
 		return
-	}); err != nil {
-		engine1.Flush()
+	}); err == nil {
+		engine1.Flush(0)
 		database.Commit()
 	} else {
 		database.Rollback()

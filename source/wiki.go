@@ -70,6 +70,7 @@ func LoadWiki(wikipedia string, maxArticleCount int, handler DocHandler)(err err
 				if !m && p.Redirect.Title == "" {
 					err = handler(p.Title, p.Text)
 					count++
+					fmt.Printf("count:%d title: %s\n", count, p.Title)
 					if err != nil {
 						fmt.Println(err)
 						break

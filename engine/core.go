@@ -1,9 +1,10 @@
 package engine
 
 import (
-	"fmt"
 	"github.com/longbai/wiser-go/db"
 )
+
+const QueryDocId = -1
 
 type Engine struct {
 	TokenPersistent
@@ -11,7 +12,6 @@ type Engine struct {
 	PostingsPersistent
 	SettingPersistent
 	buffer *TokenIndex
-	flushThreshold int
 }
 
 func NewEngine(d *db.Db, compress string, flushThreshold int) *Engine{
@@ -21,7 +21,6 @@ func NewEngine(d *db.Db, compress string, flushThreshold int) *Engine{
 		PostingsPersistent: d,
 		SettingPersistent:  d,
 		buffer: NewTokenIndex(d, compress),
-		flushThreshold: flushThreshold,
 	}
 }
 
@@ -33,10 +32,9 @@ func (e *Engine)BuildPostings(title, body string)(err error) {
 	var did int
 	did, err = e.PersistDocument(title, body)
 	err = e.buffer.TextToPostingsLists(did, body)
-	fmt.Println("text", err)
 	return
 }
 
-func (e *Engine)Flush(){
-	e.buffer.Flush(e.flushThreshold)
+func (e *Engine)Flush(flushThreshold int){
+	e.buffer.Flush(flushThreshold)
 }
