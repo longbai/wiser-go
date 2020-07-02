@@ -70,13 +70,13 @@ func main() {
 	}
 }
 
-func query(database *db.Db, query string, enablePhraseSearch bool) {
+func query(database *db.SqliteDb, query string, enablePhraseSearch bool) {
 	cm, _ := database.GetSettings("compress_method")
 	indexCount, _ := database.GetDocumentCount()
 	engine.Search(query, cm, indexCount, database, enablePhraseSearch)
 }
 
-func construct(database *db.Db, compressMethod string, wikipediaDump string, maxIndexCount, iibuThreshold int) (err error) {
+func construct(database *db.SqliteDb, compressMethod string, wikipediaDump string, maxIndexCount, iibuThreshold int) (err error) {
 	err = database.SetSettings("compress_method", compressMethod)
 	if err != nil {
 		return err

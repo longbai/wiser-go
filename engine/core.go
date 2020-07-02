@@ -14,7 +14,7 @@ type Engine struct {
 	buffer *TokenIndex
 }
 
-func NewEngine(d *db.Db, compress string, flushThreshold int) *Engine{
+func NewEngine(d *db.SqliteDb, compress string, flushThreshold int) *Engine{
 	return &Engine{
 		TokenPersistent:    &dbTokenPersistent{d},
 		DocumentPersistent: &dbDocumentPersistent{d},

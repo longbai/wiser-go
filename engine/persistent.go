@@ -31,41 +31,41 @@ type SettingPersistent interface {
 }
 
 type dbDocumentPersistent struct {
-	*db.Db
+	*db.SqliteDb
 }
 
 func (d *dbDocumentPersistent) GetDocumentId(title string) (int, error){
-	return d.Db.GetDocumentId(title)
+	return d.SqliteDb.GetDocumentId(title)
 }
 
 func (d *dbDocumentPersistent) GetDocumentTitle(id int) (string, error){
-	return d.Db.GetDocumentTitle(id)
+	return d.SqliteDb.GetDocumentTitle(id)
 }
 
 func (d *dbDocumentPersistent) PersistDocument(title, body string) (did int, err error){
 	if title == "" || body == "" {
 		return -1, ErrEmptyDocument
 	}
-	did, err = d.Db.AddDocument(title, body)
+	did, err = d.SqliteDb.AddDocument(title, body)
 	return
 }
 
 func (d *dbDocumentPersistent) GetDocumentCount() (count int, err error){
-	return d.Db.GetDocumentCount()
+	return d.SqliteDb.GetDocumentCount()
 }
 
 type dbTokenPersistent struct {
-	*db.Db
+	*db.SqliteDb
 }
 
 func (d *dbTokenPersistent)PersistToken(token string)(id, count int, err error) {
-	return d.Db.GetTokenId(token, true)
+	return d.SqliteDb.GetTokenId(token, true)
 }
 
 func (d *dbTokenPersistent)GetTokenId(token string)(id, count int, err error) {
-	return d.Db.GetTokenId(token, false)
+	return d.SqliteDb.GetTokenId(token, false)
 }
 
 func (d *dbTokenPersistent)GetToken(id int)(token string, err error) {
-	return d.Db.GetToken(id)
+	return d.SqliteDb.GetToken(id)
 }

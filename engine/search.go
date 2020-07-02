@@ -23,7 +23,7 @@ type docSearchCursor struct {
 	current   *encoding.PostingsList /* 当前的文档编号 */
 }
 
-func Search(query, compressMethod string, indexCount int, d *db.Db, enablePhraseSearch bool) error {
+func Search(query, compressMethod string, indexCount int, d *db.SqliteDb, enablePhraseSearch bool) error {
 	if len(query) < NGram {
 		fmt.Println("too short")
 		return errors.New("query short than token length")
@@ -188,7 +188,7 @@ func (t *TokenIndex) sortItems() ByCount {
 	return b
 }
 
-func splitQueryToTokens(query, compressMethod string, d *db.Db) (*TokenIndex, error) {
+func splitQueryToTokens(query, compressMethod string, d *db.SqliteDb) (*TokenIndex, error) {
 	index := NewTokenIndex(d, compressMethod)
 	err := index.TextToPostingsLists(QueryDocId, query)
 	if err != nil {

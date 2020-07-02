@@ -5,7 +5,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type Db struct {
+type SqliteDb struct {
 	db                    *sql.DB
 	get_document_id_st    *sql.Stmt
 	get_document_title_st *sql.Stmt
@@ -27,12 +27,12 @@ type Db struct {
 	tx *sql.Tx
 }
 
-func Open(path string) (*Db, error) {
+func Open(path string) (*SqliteDb, error) {
 	d, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, err
 	}
-	ret := Db{}
+	ret := SqliteDb{}
 	ret.db = d
 
 	d.Exec("CREATE TABLE settings  ( key TEXT PRIMARY KEY, value TEXT);")
@@ -66,23 +66,23 @@ func Open(path string) (*Db, error) {
 	return &ret, nil
 }
 
-func (db *Db) Close() {
+func (db *SqliteDb) Close() {
 	db.db.Close()
 }
 
-func (db *Db) GetDocumentId(title string) (int, error) {
+func (db *SqliteDb) GetDocumentId(title string) (int, error) {
 	var value int
 	err := db.get_document_id_st.QueryRow(title).Scan(&value)
 	return value, err
 }
 
-func (db *Db) GetDocumentTitle(id int) (string, error) {
+func (db *SqliteDb) GetDocumentTitle(id int) (string, error) {
 	var value string
 	err := db.get_document_title_st.QueryRow(id).Scan(&value)
 	return value, err
 }
 
-func (db *Db) AddDocument(title, body string) (did int, err error) {
+func (db *SqliteDb) AddDocument(title, body string) (did int, err error) {
 	did, err = db.GetDocumentId(title)
 	if err != nil && err != sql.ErrNoRows {
 		return
@@ -99,12 +99,12 @@ func (db *Db) AddDocument(title, body string) (did int, err error) {
 	return
 }
 
-func (db *Db) GetDocumentCount() (count int, err error) {
+func (db *SqliteDb) GetDocumentCount() (count int, err error) {
 	err = db.get_document_count_st.QueryRow().Scan(&count)
 	return
 }
 
-func (db *Db) GetTokenId(token string, insert bool)(id, count int, err error) {
+func (db *SqliteDb) GetTokenId(token string, insert bool)(id, count int, err error) {
 	if insert {
 		_, err = db.store_token_st.Exec(token, "")
 		if err != nil {
@@ -115,39 +115,39 @@ func (db *Db) GetTokenId(token string, insert bool)(id, count int, err error) {
 	return
 }
 
-func (db *Db) GetToken(id int)(token string, err error) {
+func (db *SqliteDb) GetToken(id int)(token string, err error) {
 	err = db.get_token_st.QueryRow(id).Scan(&token)
 	return
 }
 
-func (db *Db) GetPostings(id int) (count int, postings []byte, err error){
+func (db *SqliteDb) GetPostings(id int) (count int, postings []byte, err error){
 	err = db.get_postings_st.QueryRow(id).Scan(&count, &postings)
 	return
 }
 
-func (db *Db) UpdatePostings(tokenId int, docCount int, postings []byte) (err error){
+func (db *SqliteDb) UpdatePostings(tokenId int, docCount int, postings []byte) (err error){
 	_, err = db.update_postings_st.Exec(docCount, postings, tokenId)
 	return
 }
 
-func (db *Db) SetSettings(name, value string) error{
+func (db *SqliteDb) SetSettings(name, value string) error{
 	_, err := db.set_settings_st.Exec(name, value)
 	return err
 }
 
-func (db *Db) GetSettings(name string) (value string, err error) {
+func (db *SqliteDb) GetSettings(name string) (value string, err error) {
 	err = db.get_settings_st.QueryRow(name).Scan(&value)
 	return
 }
 
-func (db *Db) Begin() {
+func (db *SqliteDb) Begin() {
 	db.tx, _ = db.db.Begin()
 }
 
-func (db *Db) Commit() {
+func (db *SqliteDb) Commit() {
 	db.tx.Commit()
 }
 
-func (db *Db) Rollback() {
+func (db *SqliteDb) Rollback() {
 	db.tx.Rollback()
 }

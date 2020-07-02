@@ -114,24 +114,27 @@ func ignoreChar(r rune) bool {
 }
 // 2-gram
 func biGramSplit(body string, f func(string, int) error){
-	ignoreLast := false
+	ignoreLast := true
 	var lastRune rune
+	charPos := 0
 	for i, r := range body {
 		if ignoreChar(r) {
 			if !ignoreLast && i != 0{
 				s := string([]rune{lastRune})
-				err:= f(s, i-1)
+				err:= f(s, charPos-1)
 				if err != nil {
 					return
 				}
 			}
 			ignoreLast = true
 			continue
+		}else {
+			charPos++
 		}
 
 		if !ignoreLast && i != 0 {
 			s := string([]rune{lastRune, r})
-			err:= f(s, i-1)
+			err:= f(s, charPos-2)
 			if err != nil {
 				return
 			}

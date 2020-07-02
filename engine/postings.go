@@ -24,11 +24,11 @@ func (p *tokenIndexItems) merge(other *tokenIndexItems) {
 
 type TokenIndex struct {
 	index    map[int]*tokenIndexItems
-	database *db.Db
+	database *db.SqliteDb
 	compress string
 }
 
-func NewTokenIndex(d *db.Db, compressMethod string) *TokenIndex {
+func NewTokenIndex(d *db.SqliteDb, compressMethod string) *TokenIndex {
 	return &TokenIndex{
 		index:    make(map[int]*tokenIndexItems),
 		database: d,
