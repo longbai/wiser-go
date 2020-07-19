@@ -28,11 +28,16 @@ func Search(query, compressMethod string, indexCount int, d *db.SqliteDb, enable
 		fmt.Println("too short")
 		return errors.New("query short than token length")
 	}
-	t, err := splitQueryToTokens(query, compressMethod, d)
+
+	t := TextProcessing{&dbTokenPersistent{d}}
+	v, err := t.TextToPostingsLists(QueryDocId, query)
 	if err != nil {
 		return err
 	}
-	r := t.searchDocs(enablePhraseSearch, indexCount)
+	pm := NewPostingsManager(d, compressMethod)
+	pm.Merge(v)
+
+	r := pm.searchDocs(enablePhraseSearch, indexCount)
 	r.sort()
 	r.print()
 	return nil
@@ -45,7 +50,7 @@ func searchPhrase(tokens []*tokenIndexItems, docCursors []docSearchCursor) (phra
 	for _, v := range tokens {
 		positions += v.positionsCount
 	}
-
+	fmt.Println("s11111", len(tokens), positions)
 	/* 初始化游标 */
 	cursors := make([]phraseSearchCursor, positions)
 	cursorPos := 0
@@ -56,12 +61,13 @@ func searchPhrase(tokens []*tokenIndexItems, docCursors []docSearchCursor) (phra
 			cursors[cursorPos].current = 0
 		}
 	}
-
+	fmt.Println("s2222")
 	/* 检索短语 */
 	for cursors[0].current < len(cursors[0].positions) {
 		var relPosition, nextRelPosition int
 		nextRelPosition = cursors[cursorPos].positions[cursors[0].current] - cursors[0].base
 		relPosition = nextRelPosition
+		fmt.Println("s333", relPosition, nextRelPosition)
 		/* 对于除词元A以外的词元，不断地向后读取其出现位置，直到其偏移量不小于词元A的偏移量为止 */
 		for _, cur := range cursors[1:] {
 			for ; cur.current < len(cur.positions) && (cur.positions[cur.current]-cur.base) < relPosition; cur.current++ {
@@ -76,6 +82,7 @@ func searchPhrase(tokens []*tokenIndexItems, docCursors []docSearchCursor) (phra
 				break
 			}
 		}
+		fmt.Println("s444", relPosition, nextRelPosition)
 		if nextRelPosition < relPosition {
 			/* 不断向后读取，直到词元A的偏移量不小于next_rel_position为止 */
 			for cursors[0].current < len(cursors[0].positions)&&
@@ -97,10 +104,11 @@ func calcTfIdf(tokens []*tokenIndexItems, cursors []docSearchCursor, indexCount 
 	return score
 }
 
-func (t *TokenIndex) searchDocs(phrase bool, indexCount int) SearchResults {
+func (t *PostingsManager) searchDocs(phrase bool, indexCount int) SearchResults {
 	var ret []documentScore
 	items := t.sortItems()
 	tokenCount := len(items)
+	fmt.Println("token count", tokenCount)
 	cursors := make([]docSearchCursor, tokenCount)
 	for k, v := range items {
 		if v.tokenId == 0 {
@@ -115,8 +123,10 @@ func (t *TokenIndex) searchDocs(phrase bool, indexCount int) SearchResults {
 			fmt.Println("no postings list")
 			return nil
 		}
-		cursors[k].documents = pl
-		cursors[k].current = pl
+		cursors[k] = docSearchCursor{
+			documents: pl,
+			current:   pl,
+		}
 	}
 
 	for cursors[0].current != nil{
@@ -126,6 +136,7 @@ func (t *TokenIndex) searchDocs(phrase bool, indexCount int) SearchResults {
 		/* 对于除词元A以外的词元，不断获取其下一个document_id，直到当前的document_id不小于词元A的document_id为止 */
 		for _, cur := range cursors {
 			for cur.current != nil && cur.current.DocumentId < docId {
+				fmt.Println("1111")
 				cur.current = cur.current.Next
 			}
 			if cur.current == nil {
@@ -135,34 +146,45 @@ func (t *TokenIndex) searchDocs(phrase bool, indexCount int) SearchResults {
 			/* 那么就将这个document_id设定为next_doc_id */
 			if cur.current.DocumentId != docId {
 				nextDocId = cur.current.DocumentId
+				fmt.Println("2222")
 				break
 			}
+			fmt.Println("3333")
 		}
 
 		if nextDocId > 0{
 			/* 不断获取A的下一个document_id，直到其当前的document_id不小于next_doc_id为止 */
 			for cursors[0].current != nil && cursors[0].current.DocumentId < nextDocId {
 				cursors[0].current = cursors[0].current.Next
+				fmt.Println("4444")
 			}
+			fmt.Println("5555")
 		} else {
+			fmt.Println("6666")
 			phraseCount := -1
 			if phrase {
+				fmt.Println("7777")
 				phraseCount = searchPhrase(items, cursors)
 			}
+			fmt.Println("8888")
 			if phraseCount != 0{
 				 doubleScore := calcTfIdf(items, cursors, indexCount)
+				 fmt.Println("9999")
+				 title, _ := t.database.GetDocumentTitle(docId)
 				 ret = append(ret, documentScore{
 					 docId: docId,
+					 docTitle: title,
 					 score: doubleScore,
 				 })
 			}
+			fmt.Println("00000")
 			cursors[0].current = cursors[0].current.Next
 		}
 	}
 	return ret
 }
 
-func (t *TokenIndex) positionsCount() int {
+func (t *PostingsManager) positionsCount() int {
 	count := 0
 	for _, v := range t.index {
 		count += v.positionsCount
@@ -176,7 +198,7 @@ func (a ByCount) Len() int           { return len(a) }
 func (a ByCount) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByCount) Less(i, j int) bool { return a[i].docCount < a[j].docCount }
 
-func (t *TokenIndex) sortItems() ByCount {
+func (t *PostingsManager) sortItems() ByCount {
 	items := make([]*tokenIndexItems, len(t.index))
 	i:= 0
 	for _, v := range t.index {
@@ -188,17 +210,9 @@ func (t *TokenIndex) sortItems() ByCount {
 	return b
 }
 
-func splitQueryToTokens(query, compressMethod string, d *db.SqliteDb) (*TokenIndex, error) {
-	index := NewTokenIndex(d, compressMethod)
-	err := index.TextToPostingsLists(QueryDocId, query)
-	if err != nil {
-		return nil, err
-	}
-	return index, nil
-}
-
 type documentScore struct {
 	docId int
+	docTitle string
 	score float64
 }
 
@@ -209,10 +223,12 @@ func (a SearchResults) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a SearchResults) Less(i, j int) bool { return a[i].score > a[j].score }
 
 
-func (r SearchResults) print() {
-
+func (a SearchResults) print() {
+	for _, v := range a {
+		fmt.Printf("%+v\n", v)
+	}
 }
 
-func (r SearchResults) sort() {
-	sort.Sort(r)
+func (a SearchResults) sort() {
+	sort.Sort(a)
 }

@@ -5,7 +5,7 @@ func EncodePostingsGolomb(postings *PostingsList, count int) []byte{
 }
 
 
-func DecodePostingsGolomb(data []byte) *PostingsList {
-	return nil
+func DecodePostingsGolomb(data []byte) (list *PostingsList, count int, err error) {
+	return
 }
 

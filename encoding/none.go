@@ -1,6 +1,8 @@
 package encoding
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+)
 
 func calcBufferSize(postings *PostingsList) int {
 	var pl *PostingsList
@@ -11,9 +13,9 @@ func calcBufferSize(postings *PostingsList) int {
 	return count
 }
 
-func EncodePostingsNone(postings *PostingsList) []byte {
+func EncodePostingsNone(postings *PostingsList, count int) []byte {
 	var pl *PostingsList
-
+	c := 0
 	buf := make([]byte, calcBufferSize(postings))
 	pos := 0
 	for pl = postings; pl != nil; pl = pl.Next {
@@ -25,30 +27,41 @@ func EncodePostingsNone(postings *PostingsList) []byte {
 			binary.LittleEndian.PutUint32(buf[pos:], uint32(v))
 			pos += 4
 		}
+		c++
+	}
+	if c != count {
+		//fmt.Println("encoding miss", c, count)
 	}
 	return buf
 }
 
-func DecodePostingsNone(data []byte) *PostingsList {
-	first := &PostingsList{}
-	pl := first
+func DecodePostingsNone(data []byte) (list *PostingsList, count int, err error) {
+	var pl *PostingsList
 	length := len(data)
 	pos := 0
+	var prev *PostingsList
 	for pos < length {
-		if pl == nil {
-			pl = new(PostingsList)
+		pl = new(PostingsList)
+		if pos == 0 {
+			list = pl
+			prev = pl
 		}
+		count++
+
 		pl.DocumentId = int(binary.LittleEndian.Uint32(data[pos:]))
 		pos += 4
 		length := int(binary.LittleEndian.Uint32(data[pos:]))
 		pos += 4
 		pl.Positions = make([]int, length)
-		for i:= 0;i<length;i++ {
+		for i := 0; i < length; i++ {
 			pl.Positions[i] = int(binary.LittleEndian.Uint32(data[pos:]))
 			pos += 4
 		}
-		pl = pl.Next
-	}
-	return first
-}
+		if prev != pl {
+			prev.Next = pl
+			prev = pl
+		}
 
+	}
+	return
+}

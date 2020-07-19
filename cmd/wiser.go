@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	//"github.com/pkg/profile"
+
 	"github.com/longbai/wiser-go/db"
 	"github.com/longbai/wiser-go/engine"
 	"github.com/longbai/wiser-go/source"
@@ -25,6 +27,7 @@ import (
 
 var scan bool
 func main() {
+	//defer profile.Start().Stop()
 	compressMethod := flag.String("c", "golomb", "compress method for postings list(none   : don't compress;golomb : Golomb-Rice,default)")
 	wikipediaDump := flag.String("x", "", "wikipedia dump xml path for indexing")
 	queryStr := flag.String("q", "", "query for search")
@@ -73,6 +76,7 @@ func main() {
 func query(database *db.SqliteDb, query string, enablePhraseSearch bool) {
 	cm, _ := database.GetSettings("compress_method")
 	indexCount, _ := database.GetDocumentCount()
+	fmt.Println("document count", indexCount)
 	engine.Search(query, cm, indexCount, database, enablePhraseSearch)
 }
 

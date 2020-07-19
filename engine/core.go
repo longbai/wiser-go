@@ -7,20 +7,20 @@ import (
 const QueryDocId = -1
 
 type Engine struct {
-	TokenPersistent
 	DocumentPersistent
 	PostingsPersistent
 	SettingPersistent
-	buffer *TokenIndex
+	buffer *PostingsManager
+	t *TextProcessing
 }
 
 func NewEngine(d *db.SqliteDb, compress string, flushThreshold int) *Engine{
 	return &Engine{
-		TokenPersistent:    &dbTokenPersistent{d},
 		DocumentPersistent: &dbDocumentPersistent{d},
 		PostingsPersistent: d,
 		SettingPersistent:  d,
-		buffer: NewTokenIndex(d, compress),
+		buffer:             NewPostingsManager(d, compress),
+		t:                  &TextProcessing{&dbTokenPersistent{d}},
 	}
 }
 
@@ -31,7 +31,14 @@ func (e *Engine)BuildPostings(title, body string)(err error) {
 	}
 	var did int
 	did, err = e.PersistDocument(title, body)
-	err = e.buffer.TextToPostingsLists(did, body)
+	if err != nil {
+		return err
+	}
+	v, err := e.t.TextToPostingsLists(did, body)
+	if err != nil {
+		return err
+	}
+	e.buffer.Merge(v)
 	return
 }
 

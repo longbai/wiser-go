@@ -2,8 +2,8 @@ package engine
 
 import (
 	"fmt"
-	"unicode/utf8"
 	"github.com/longbai/wiser-go/encoding"
+	"unicode/utf8"
 )
 
 func ignoreChar(r rune) bool {
@@ -144,36 +144,39 @@ func biGramSplit(body string, f func(string, int) error){
 	}
 }
 
-func (p *TokenIndex) TextToPostingsLists(documentId int, body string) (err error) {
-	p2 := &TokenIndex{
-		index:    make(map[int]*tokenIndexItems),
-		database: p.database,
-	}
+
+type TextProcessing struct {
+	TokenPersistent
+}
+
+func (p *TextProcessing) TextToPostingsLists(documentId int, body string) (index map[int]*tokenIndexItems, err error) {
 	fmt.Println("body size", utf8.RuneCountInString(body))
 	count := 0
+	index = make(map[int]*tokenIndexItems)
 	biGramSplit(body, func(s string, pos int) error {
 		count++
-		return p2.tokenToPostingsList(documentId, s, pos)
+		return p.tokenToPostingsList(index, documentId, s, pos)
 	})
-	fmt.Println("token count", count)
-	p.Merge(p2)
+	fmt.Println("split token count", count)
 	return
 }
 
-func (p *TokenIndex) tokenToPostingsList(documentId int, token string, position int) error {
-	id, count, err := p.database.GetTokenId(token, documentId != QueryDocId)
+func (p *TextProcessing) tokenToPostingsList(index map[int]*tokenIndexItems, documentId int, token string, position int) error {
+	var pt = p.PersistToken
+	if documentId == QueryDocId{
+		pt = p.GetTokenId
+	}
+	id, _, err := pt(token)
 	if err != nil {
 		return err
 	}
-	if documentId == QueryDocId || count == 0{
-		count = 1
-	}
-	entry, ok := p.index[id]
+
+	entry, ok := index[id]
 	if !ok {
 		entry = &tokenIndexItems{
 			tokenId:        id,
 			token: token,
-			docCount:       count,
+			docCount:       1,
 			positionsCount: 0,
 			postings: &encoding.PostingsList{
 				DocumentId: documentId,
@@ -181,10 +184,24 @@ func (p *TokenIndex) tokenToPostingsList(documentId int, token string, position 
 				Next:       nil,
 			},
 		}
-		p.index[id] = entry
+		index[id] = entry
 
 	}
 	entry.postings.Positions = append(entry.postings.Positions, position)
 	entry.positionsCount++
 	return nil
 }
+
+type tokenIndexItems struct {
+	token		string // for debug
+	tokenId        int
+	docCount       int
+	positionsCount int
+	postings       *encoding.PostingsList
+}
+
+func (p *tokenIndexItems) merge(other *tokenIndexItems) {
+	p.docCount += other.docCount
+	p.postings = encoding.Merge(p.postings, other.postings)
+}
+

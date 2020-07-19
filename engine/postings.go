@@ -3,33 +3,19 @@ package engine
 import (
 	"errors"
 	"fmt"
-
 	"github.com/longbai/wiser-go/db"
 	"github.com/longbai/wiser-go/encoding"
 	"github.com/longbai/wiser-go/util"
 )
 
-type tokenIndexItems struct {
-	token		string // for debug
-	tokenId        int
-	docCount       int
-	positionsCount int
-	postings       *encoding.PostingsList
-}
-
-func (p *tokenIndexItems) merge(other *tokenIndexItems) {
-	p.docCount += other.docCount
-	p.postings = encoding.Merge(p.postings, other.postings)
-}
-
-type TokenIndex struct {
+type PostingsManager struct {
 	index    map[int]*tokenIndexItems
 	database *db.SqliteDb
 	compress string
 }
 
-func NewTokenIndex(d *db.SqliteDb, compressMethod string) *TokenIndex {
-	return &TokenIndex{
+func NewPostingsManager(d *db.SqliteDb, compressMethod string) *PostingsManager {
+	return &PostingsManager{
 		index:    make(map[int]*tokenIndexItems),
 		database: d,
 		compress: compressMethod,
@@ -37,7 +23,7 @@ func NewTokenIndex(d *db.SqliteDb, compressMethod string) *TokenIndex {
 }
 
 /* 存储在缓冲区中的文档数量达到了指定的阈值时，更新存储器上的倒排索引 */
-func (p *TokenIndex) Flush(threshold int) {
+func (p *PostingsManager) Flush(threshold int) {
 	l := len(p.index)
 	if l <= threshold {
 		return
@@ -60,13 +46,13 @@ func (p *TokenIndex) Flush(threshold int) {
  * @param[out] postings 获取到的倒排列表
  * @param[out] postings_len 获取到的倒排列表中的元素数
  */
-func (p *TokenIndex) fetchPostings(tokenId int) (pl *encoding.PostingsList, length int, err error) {
+func (p *PostingsManager) fetchPostings(tokenId int) (pl *encoding.PostingsList, length int, err error) {
 	count, postings, err := p.database.GetPostings(tokenId)
 	if err != nil || count == 0 || len(postings) == 0 {
 		return nil, 0, err
 	}
 
-	pl, length, err = p.decodePostings(postings)
+	pl, length, err = encoding.DecodePostings(postings, p.compress)
 	if err != nil {
 		fmt.Println("postings list decode error", err)
 		return
@@ -78,64 +64,37 @@ func (p *TokenIndex) fetchPostings(tokenId int) (pl *encoding.PostingsList, leng
 	return
 }
 
-func (p *TokenIndex) encodePostings(postings *encoding.PostingsList, count int) []byte {
-	switch p.compress {
-	case "none":
-		return encoding.EncodePostingsNone(postings)
-	case "golomb":
-		c, _ := p.database.GetDocumentCount()
-		return encoding.EncodePostingsGolomb(postings, c)
-	default:
-		util.Abort()
-	}
-	return nil
-}
-
-func (p *TokenIndex) decodePostings(data []byte) (list *encoding.PostingsList, count int, err error) {
-	switch p.compress {
-	case "none":
-		encoding.DecodePostingsNone(data)
-	case "golomb":
-		encoding.DecodePostingsGolomb(data)
-	default:
-
-		util.Abort()
-	}
-	return
-}
-
 /**
  * 将内存上（小倒排索引中）的倒排列表与存储器上的倒排列表合并后存储到数据库中
  * @param[in] env 存储着应用程序运行环境的结构体
  * @param[in] p 含有倒排列表的倒排索引中的索引项
  */
-func (p *TokenIndex) updatePostings(tokenId int, items *tokenIndexItems) {
+func (p *PostingsManager) updatePostings(tokenId int, items *tokenIndexItems) {
 	oldPostings, length, err := p.fetchPostings(tokenId)
 	if err != nil {
-		fmt.Printf("cannot fetch old postings list of token(%d) for update.\n", tokenId)
+		fmt.Printf("cannot fetch old postings list of token(%d) for update. %s\n", tokenId, err.Error())
 		return
 	}
 
-	if length != 0 {
-		encoding.Merge(items.postings, oldPostings)
+	if length != 0{
+		items.postings = encoding.Merge(items.postings, oldPostings)
 		items.docCount += length
 	}
-
-	data := p.encodePostings(items.postings, items.docCount)
-
+	if items.docCount != items.postings.Length(){
+		fmt.Println("length miss", tokenId, items.docCount, items.postings.Length(), length, items.docCount - length)
+	}
+	data := encoding.EncodePostings(items.postings, p.compress, items.docCount)
 	p.database.UpdatePostings(tokenId, items.docCount, data)
 }
 
-func (p *TokenIndex) Merge(other *TokenIndex) {
+func (p *PostingsManager) Merge(index map[int]*tokenIndexItems) {
 	if len(p.index) == 0 {
-		p.index = other.index
+		p.index = index
 		return
 	}
-	for k, v := range other.index {
+	for k, v := range index {
 		if v2, ok := p.index[k]; ok {
-			//fmt.Println("merge list", v2.tokenId, v2.token, v2.docCount, v.tokenId, v.token, v.docCount)
 			v2.merge(v)
-			//fmt.Println("merge done")
 		} else {
 			p.index[k] = v
 		}
